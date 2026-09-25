@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# First-time setup. Uses the local Composer when there is one (Sail itself
+# lives in vendor/), otherwise bootstraps it in a Composer container.
+# Everything after that runs through Sail: ./vendor/bin/sail composer|npm|artisan …
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+[ -f .env ] || cp .env.example .env
+
+if [ ! -x vendor/bin/sail ]; then
+    if command -v composer >/dev/null 2>&1; then
+        composer install
+    else
+        echo "No local Composer — bootstrapping through a container instead."
+        docker run --rm -u "$(id -u):$(id -g)" -v "$(pwd):/var/www/html" -w /var/www/html \
+            laravelsail/php84-composer:latest composer install --ignore-platform-reqs
+    fi
+fi
+
+./vendor/bin/sail up -d
+./vendor/bin/sail composer install
+grep -q "^APP_KEY=$" .env && ./vendor/bin/sail artisan key:generate --no-interaction
+./vendor/bin/sail artisan migrate --force
+./vendor/bin/sail npm install
+./vendor/bin/sail npm run build
+
+port=$(grep -E '^APP_PORT=' .env | cut -d= -f2)
+echo
+echo "Kitchen planner is running at http://localhost:${port:-80}"
+echo "Laravel Boost is installed; generate its guidelines with:"
+echo "  ./vendor/bin/sail artisan boost:install"
