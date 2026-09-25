@@ -41,8 +41,12 @@ jobs:
       - name: Generate app key
         run: php artisan key:generate
 
+      # The Sail MySQL host from .env.example doesn't exist on the runner.
       - name: Execute tests
         run: php artisan test
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ':memory:'
 
   frontend:
     runs-on: ubuntu-latest
